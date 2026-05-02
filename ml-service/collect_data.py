@@ -29,7 +29,6 @@ def main():
     HandLandmarkerOptions = mp.tasks.vision.HandLandmarkerOptions
     VisionRunningMode = mp.tasks.vision.RunningMode
 
-    # Make sure model exists
     model_path = 'model/hand_landmarker.task'
     if not os.path.exists(model_path):
         print(f"Error: {model_path} not found. Ensure it was downloaded.")
@@ -42,13 +41,13 @@ def main():
     )
 
     os.makedirs('data', exist_ok=True)
-    csv_file_path = 'data/chord_data.csv'
+    csv_file_path = 'data/chord_recordings.csv'
     write_header = not os.path.exists(csv_file_path)
     
     csv_file = open(csv_file_path, 'a', newline='')
     writer = csv.writer(csv_file)
     if write_header:
-        header = ['label'] + [f'{axis}_{i}' for i in range(21) for axis in ['x', 'y', 'z']]
+        header = ['label', 'angle'] + [f'{axis}_{i}' for i in range(21) for axis in ['x', 'y', 'z']]
         writer.writerow(header)
 
     key_to_chord = {
@@ -58,10 +57,19 @@ def main():
         ord('7'): 'Fmaj7',
     }
 
+    angles = ['straight', 'tilted_left', 'tilted_down']
+    samples_per_angle = 35
+
     cap = cv2.VideoCapture(0)
-    print("\nGuitar Chord Data Collector (Tasks API)")
-    print("Press a chord key to save landmarks. Press 'q' to quit.")
+    print("\n--- 3. Custom Chord Recordings ---")
+    print("Guitar Chord Data Collector (Tasks API)")
+    print("Press a chord key to start recording sequence. Press 'q' to quit.")
     print("Keys:", {chr(k): v for k, v in key_to_chord.items()})
+
+    recording_state = False
+    current_chord = None
+    current_angle_idx = 0
+    samples_recorded = 0
 
     with HandLandmarker.create_from_options(options) as landmarker:
         while cap.isOpened():
@@ -81,20 +89,59 @@ def main():
                     for lm in hand_landmarks:
                         landmarks_flat.extend([lm.x, lm.y, lm.z])
 
-            cv2.putText(frame, "Press key to save. 'q' to quit.", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            # Handle UI and Recording State
+            if recording_state:
+                current_angle = angles[current_angle_idx]
+                
+                # Instruction Box
+                cv2.rectangle(frame, (0, 0), (640, 60), (0, 0, 0), -1)
+                msg = f"Recording {current_chord} - {current_angle}"
+                cv2.putText(frame, msg, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+                progress = f"Samples: {samples_recorded}/{samples_per_angle}"
+                cv2.putText(frame, progress, (10, 55), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+                # Record if hand is visible
+                if landmarks_flat:
+                    writer.writerow([current_chord, current_angle] + landmarks_flat)
+                    csv_file.flush()
+                    samples_recorded += 1
+                    
+                    # If finished with this angle
+                    if samples_recorded >= samples_per_angle:
+                        samples_recorded = 0
+                        current_angle_idx += 1
+                        
+                        # If finished with all angles
+                        if current_angle_idx >= len(angles):
+                            print(f"Finished sequence for {current_chord}")
+                            recording_state = False
+                            current_chord = None
+                            current_angle_idx = 0
+                        else:
+                            # Give a brief pause between angles visually
+                            print(f"Switching to angle: {angles[current_angle_idx]}")
+                            cv2.putText(frame, "SWITCH ANGLE!", (200, 240), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
+                            cv2.imshow('Data Collector', frame)
+                            cv2.waitKey(2000) # Wait 2 seconds for user to adjust hand
+            else:
+                cv2.rectangle(frame, (0, 0), (640, 40), (0, 0, 0), -1)
+                cv2.putText(frame, "Press key to start sequence. 'q' to quit.", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
             cv2.imshow('Data Collector', frame)
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
                 break
-            elif key in key_to_chord:
-                if landmarks_flat:
-                    label = key_to_chord[key]
-                    writer.writerow([label] + landmarks_flat)
-                    csv_file.flush()
-                    print(f"Saved sample for chord: {label}")
-                else:
-                    print("Hand not detected! Cannot save.")
+            elif not recording_state and key in key_to_chord:
+                current_chord = key_to_chord[key]
+                recording_state = True
+                current_angle_idx = 0
+                samples_recorded = 0
+                print(f"Starting sequence for {current_chord}")
+                # Wait 1.5s to get ready
+                cv2.putText(frame, "GET READY...", (200, 240), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 255), 3)
+                cv2.imshow('Data Collector', frame)
+                cv2.waitKey(1500)
 
     cap.release()
     cv2.destroyAllWindows()
