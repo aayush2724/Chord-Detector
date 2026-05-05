@@ -9,18 +9,18 @@ import time
 def download_progress(count, block_size, total_size):
     percent = int(count * block_size * 100 / total_size)
     if percent % 10 == 0:
-        print(f"\rDownloading Hagrid subsample: {percent}%", end="")
+        print(f"\rDownloading hand keypoints dataset: {percent}%", end="")
 
 def download_and_extract():
-    url = 'https://sc.link/AO5l'
-    zip_path = 'data/hagrid_subsample.zip'
-    extract_path = 'data/hagrid'
+    url = 'https://github.com/ultralytics/assets/releases/download/v0.0.0/hand-keypoints.zip'
+    zip_path = 'data/hand-keypoints.zip'
+    extract_path = 'data/hand_keypoints'
 
     os.makedirs('data', exist_ok=True)
     
     if not os.path.exists(extract_path):
         if not os.path.exists(zip_path):
-            print("Downloading Hagrid dataset (this might take a few minutes for ~2GB)...")
+            print("Downloading hand keypoints dataset (386MB)...")
             urllib.request.urlretrieve(url, zip_path, reporthook=download_progress)
             print("\nDownload complete.")
         

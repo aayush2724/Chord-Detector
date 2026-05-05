@@ -1,71 +1,108 @@
+"""
+merge_datasets.py
+=================
+Merges all available CSVs into a single training_data_final.csv.
+
+Sources (all optional — uses whatever exists):
+  - data/augmented_public_hands.csv   (background / non-chord hands)
+  - data/global_chords.csv            (scraped labeled guitar chords)
+  - data/chord_recordings.csv         (your personal camera recordings)
+"""
+
 import os
 import csv
 import sys
+from collections import Counter
+
+
+def load_csv(path, normalize_cols):
+    """Load a CSV and ensure it has the right columns. Returns (header, rows)."""
+    rows = []
+    with open(path, 'r') as f:
+        reader = csv.reader(f)
+        header = next(reader)
+        for row in reader:
+            if row:
+                rows.append(row)
+    return header, rows
+
+
+def normalize_row(row, src_header, tgt_header):
+    """
+    Map a source row to the target header, filling missing columns with 'unknown'.
+    """
+    src_map = {col: i for i, col in enumerate(src_header)}
+    out = []
+    for col in tgt_header:
+        if col in src_map:
+            out.append(row[src_map[col]])
+        else:
+            out.append('unknown')
+    return out
+
 
 def main():
-    augmented_public_csv = 'data/augmented_public_hands.csv'
-    chord_recordings_csv = 'data/chord_recordings.csv'
-    final_output_csv = 'data/training_data_final.csv'
+    # ── canonical header ──────────────────────────────────────────────
+    COORD_COLS = [f'{ax}_{i}' for i in range(21) for ax in ['x', 'y', 'z']]
+    TARGET_HEADER = ['label', 'source'] + COORD_COLS
 
-    print("--- 4. Merge & Prepare Final Training Data ---")
+    sources = [
+        ('data/augmented_public_hands.csv', 'augmented_public'),
+        ('data/global_chords.csv',          'global_scrape'),
+        ('data/chord_recordings.csv',        'personal_recording'),
+    ]
 
-    # Check existence
-    has_public = os.path.exists(augmented_public_csv)
-    has_chords = os.path.exists(chord_recordings_csv)
+    output_csv = 'data/training_data_final.csv'
 
-    if not has_public and not has_chords:
-        print("Error: Neither augmented_public_hands.csv nor chord_recordings.csv exist.")
+    print("=" * 55)
+    print("   Merge Datasets → training_data_final.csv")
+    print("=" * 55)
+
+    found_any = False
+    all_rows = []
+
+    for path, source_tag in sources:
+        if not os.path.exists(path):
+            print(f"  ⚠  Skipping (not found): {path}")
+            continue
+
+        found_any = True
+        header, rows = load_csv(path, TARGET_HEADER)
+
+        # Inject source column if missing
+        if 'source' not in header:
+            header = header[:1] + ['source'] + header[1:]
+            rows = [r[:1] + [source_tag] + r[1:] for r in rows]
+
+        # Add 'angle' column under a 'source' label if it has angle but not source
+        normalized = []
+        for row in rows:
+            normalized.append(normalize_row(row, header, TARGET_HEADER))
+
+        all_rows.extend(normalized)
+        print(f"  ✓  {os.path.basename(path)}: {len(rows)} samples loaded")
+
+    if not found_any:
+        print("\nError: No datasets found at all. Run the data collection scripts first.")
         sys.exit(1)
 
-    print(f"Loading datasets...")
-    
-    # Extract headers and data
-    headers = None
-    merged_data = []
-    
-    # 1. Load Public Hands (Background)
-    if has_public:
-        with open(augmented_public_csv, 'r') as f:
-            reader = csv.reader(f)
-            public_headers = next(reader)
-            if not headers: headers = public_headers
-            
-            count = 0
-            for row in reader:
-                merged_data.append(row)
-                count += 1
-        print(f"Loaded {count} public background samples.")
-    else:
-        print(f"Warning: {augmented_public_csv} not found. Skipping public data.")
-
-    # 2. Load Chord Recordings
-    if has_chords:
-        with open(chord_recordings_csv, 'r') as f:
-            reader = csv.reader(f)
-            chord_headers = next(reader)
-            if not headers: headers = chord_headers
-            
-            # Simple check to ensure schemas match
-            if len(chord_headers) != len(headers):
-                print("Error: CSV schemas do not match between datasets!")
-                sys.exit(1)
-                
-            count = 0
-            for row in reader:
-                merged_data.append(row)
-                count += 1
-        print(f"Loaded {count} chord recordings.")
-    else:
-        print(f"Warning: {chord_recordings_csv} not found. Skipping chord recordings.")
-
-    # 3. Write Final File
-    print(f"Writing {len(merged_data)} total samples to {final_output_csv}...")
-    with open(final_output_csv, 'w', newline='') as f:
+    # ── Write final CSV ───────────────────────────────────────────────
+    with open(output_csv, 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(headers)
-        writer.writerows(merged_data)
-        
-    print("Merge complete!")
+        writer.writerow(TARGET_HEADER)
+        writer.writerows(all_rows)
+
+    # ── Summary ───────────────────────────────────────────────────────
+    label_counts = Counter(row[0] for row in all_rows)
+
+    print(f"\n  Total samples : {len(all_rows)}")
+    print(f"  Unique classes: {len(label_counts)}")
+    print(f"\n  Class breakdown:")
+    for label, count in label_counts.most_common():
+        print(f"    {label:<20} {count}")
+
+    print(f"\n  ✅ Saved → {output_csv}")
+
 
 if __name__ == '__main__':
     main()
