@@ -1,3 +1,26 @@
 venv/
 __pycache__/
 *.pyc
+
+# Node
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Environment files
+.env
+.env.local
+
+# Build output
+frontend/dist/
+dist/
+
+# macOS
+.DS_Store
+
+# Data and Models
+*.csv
+*.zip
+*.pkl
+ml-service/data/
+ml-service/model/

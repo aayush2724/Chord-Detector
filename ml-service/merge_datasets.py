@@ -12,7 +12,12 @@ Sources (all optional — uses whatever exists):
 import os
 import csv
 import sys
+import random
 from collections import Counter
+
+# Cap Background samples to reduce class imbalance
+MAX_BACKGROUND_SAMPLES = 500
+RANDOM_SEED = 42
 
 
 def load_csv(path, normalize_cols):
@@ -85,6 +90,17 @@ def main():
     if not found_any:
         print("\nError: No datasets found at all. Run the data collection scripts first.")
         sys.exit(1)
+
+    # ── Undersample Background class ──────────────────────────────────
+    background_rows = [r for r in all_rows if r[0].strip().lower() == 'background']
+    other_rows      = [r for r in all_rows if r[0].strip().lower() != 'background']
+
+    if len(background_rows) > MAX_BACKGROUND_SAMPLES:
+        random.seed(RANDOM_SEED)
+        background_rows = random.sample(background_rows, MAX_BACKGROUND_SAMPLES)
+        print(f"\n  ✂  Background undersampled: {len(background_rows)} samples kept (max {MAX_BACKGROUND_SAMPLES})")
+
+    all_rows = other_rows + background_rows
 
     # ── Write final CSV ───────────────────────────────────────────────
     with open(output_csv, 'w', newline='') as f:

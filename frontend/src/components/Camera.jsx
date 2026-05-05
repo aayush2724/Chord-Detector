@@ -1,162 +1,134 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { Camera as MediaPipeCamera } from '@mediapipe/camera_utils';
-import { Hands } from '@mediapipe/hands';
+import React, { useEffect, useRef, useState } from 'react';
+import { HandLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import axios from 'axios';
-import HandSkeleton from './HandSkeleton';
 
-// Backend URL - Change this to production URL when deploying
-const BACKEND_URL = 'http://localhost:3001/api';
+const Camera = ({ videoRef, onLandmarks, onPrediction, onStatusChange }) => {
+  const requestRef = useRef();
+  const landmarkerRef = useRef(null);
+  const lastVideoTimeRef = useRef(-1);
+  const lastPostTimeRef = useRef(0);
 
-const Camera = ({ onChordDetected, setBackendStatus }) => {
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [results, setResults] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Smooth predictions
-  const historyRef = useRef([]);
+  const [isModelLoaded, setIsModelLoaded] = useState(false);
 
   useEffect(() => {
-    let camera;
+    let active = true;
 
     const initializeMediaPipe = async () => {
-      const hands = new Hands({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
-      });
-
-      hands.setOptions({
-        maxNumHands: 1,
-        modelComplexity: 1,
-        minDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.5,
-      });
-
-      hands.onResults(handleResults);
-
-      if (videoRef.current) {
-        camera = new MediaPipeCamera(videoRef.current, {
-          onFrame: async () => {
-            if (videoRef.current) {
-              await hands.send({ image: videoRef.current });
-            }
+      onStatusChange('Loading ML Model...');
+      try {
+        const vision = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+        );
+        const landmarker = await HandLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: "/model/hand_landmarker.task",
+            delegate: "GPU"
           },
-          width: 1280,
-          height: 720,
+          runningMode: "VIDEO",
+          numHands: 1
         });
-        camera.start();
+
+        if (!active) return;
+        landmarkerRef.current = landmarker;
+        setIsModelLoaded(true);
+        onStatusChange('Model Loaded. Waiting for camera...');
+        
+        startCamera();
+      } catch (err) {
+        console.error("Error loading MediaPipe model:", err);
+        onStatusChange('Error loading ML Model.');
+      }
+    };
+
+    const startCamera = async () => {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 1280, height: 720 }
+          });
+          if (videoRef.current && active) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.addEventListener('loadeddata', predictWebcam);
+            onStatusChange('Looking for hand...');
+          }
+        } catch (err) {
+          console.error("Camera error:", err);
+          onStatusChange('Camera access denied or unavailable.');
+        }
       }
     };
 
     initializeMediaPipe();
 
     return () => {
-      if (camera) {
-        camera.stop();
+      active = false;
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      if (videoRef.current && videoRef.current.srcObject) {
+        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+      }
+      if (landmarkerRef.current) {
+        landmarkerRef.current.close();
       }
     };
   }, []);
 
-  const normalizeLandmarks = (landmarks) => {
-    // Exact same logic as Python's normalize_landmarks
-    const wrist = landmarks[0];
-    
-    // Calculate distance between wrist and middle finger MCP (landmark 9)
-    const mcp = landmarks[9];
-    const dx = mcp.x - wrist.x;
-    const dy = mcp.y - wrist.y;
-    const dz = mcp.z - wrist.z;
-    const scale = Math.sqrt(dx * dx + dy * dy + dz * dz) + 1e-6;
+  const predictWebcam = async () => {
+    if (!videoRef.current || !landmarkerRef.current) return;
+    const video = videoRef.current;
 
-    const flat = [];
-    for (let i = 0; i < landmarks.length; i++) {
-      flat.push((landmarks[i].x - wrist.x) / scale);
-      flat.push((landmarks[i].y - wrist.y) / scale);
-      flat.push((landmarks[i].z - wrist.z) / scale);
-    }
-    return flat;
-  };
-
-  const handleResults = async (res) => {
-    setResults(res);
-    setIsLoading(false);
-
-    if (canvasRef.current && videoRef.current) {
-      canvasRef.current.width = videoRef.current.videoWidth;
-      canvasRef.current.height = videoRef.current.videoHeight;
-    }
-
-    if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
-      const landmarks = res.multiHandLandmarks[0];
-      const flatLandmarks = normalizeLandmarks(landmarks);
-
-      try {
-        const response = await axios.post(`${BACKEND_URL}/predict`, {
-          landmarks: flatLandmarks
-        });
+    let startTimeMs = performance.now();
+    if (lastVideoTimeRef.current !== video.currentTime) {
+      lastVideoTimeRef.current = video.currentTime;
+      
+      const results = landmarkerRef.current.detectForVideo(video, startTimeMs);
+      
+      if (results.landmarks && results.landmarks.length > 0) {
+        const handLandmarks = results.landmarks[0];
+        onLandmarks(handLandmarks);
         
-        setBackendStatus('connected');
-
-        // Smoothing logic: Majority vote of last 5 frames
-        const pred = response.data;
-        if (pred.confidence > 0.6) {
-          historyRef.current.push(pred.chord);
-          if (historyRef.current.length > 5) {
-            historyRef.current.shift();
-          }
-
-          const counts = {};
-          let maxCount = 0;
-          let majorityChord = null;
-
-          historyRef.current.forEach(c => {
-            counts[c] = (counts[c] || 0) + 1;
-            if (counts[c] > maxCount) {
-              maxCount = counts[c];
-              majorityChord = c;
-            }
-          });
-
-          if (maxCount >= 3) {
-            onChordDetected({ chord: majorityChord, confidence: pred.confidence });
-          }
-        } else {
-          historyRef.current = [];
-          onChordDetected(null);
+        // Extract 63 floats
+        const features = [];
+        for (let i = 0; i < 21; i++) {
+          features.push(handLandmarks[i].x, handLandmarks[i].y, handLandmarks[i].z);
         }
 
-      } catch (error) {
-        console.error("Backend prediction error", error);
-        setBackendStatus('error');
+        // Throttle API calls to every 300ms
+        if (startTimeMs - lastPostTimeRef.current > 300) {
+          lastPostTimeRef.current = startTimeMs;
+          sendPredictionRequest(features);
+        }
+      } else {
+        onLandmarks(null);
+        onPrediction(null);
+        onStatusChange('Looking for hand...');
       }
-    } else {
-      historyRef.current = [];
-      onChordDetected(null);
+    }
+    
+    requestRef.current = requestAnimationFrame(predictWebcam);
+  };
+
+  const sendPredictionRequest = async (landmarks) => {
+    try {
+      const res = await axios.post('http://localhost:3001/api/predict', { landmarks });
+      onPrediction(res.data);
+      if (res.data.chord && res.data.confidence > 0.6 && res.data.chord !== 'Background') {
+        onStatusChange(`Chord: ${res.data.chord}`);
+      } else {
+        onStatusChange('Hand detected!');
+      }
+    } catch (err) {
+      console.error("API error:", err);
     }
   };
 
   return (
-    <div className="camera-wrapper">
-      {isLoading && (
-        <div className="loading-overlay">
-          <div className="spinner"></div>
-          <p>Initializing Camera & Hand Tracking...</p>
-        </div>
-      )}
-      
-      <video
-        ref={videoRef}
-        className="video-feed"
-        autoPlay
-        playsInline
-      ></video>
-      
-      <canvas
-        ref={canvasRef}
-        className="canvas-overlay"
-      ></canvas>
-
-      <HandSkeleton canvasRef={canvasRef} results={results} />
-    </div>
+    <video
+      ref={videoRef}
+      className="camera-video"
+      autoPlay
+      playsInline
+      muted
+    />
   );
 };
 

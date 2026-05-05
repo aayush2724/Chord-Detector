@@ -21,7 +21,7 @@ import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
 
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split, cross_val_score
@@ -41,12 +41,21 @@ def load_data(csv_path: str):
     X, y = [], []
     with open(csv_path, 'r') as f:
         reader = csv.reader(f)
-        header = next(reader)  # skip header
+        header = next(reader)
+        has_source = len(header) > 1 and header[1] == 'source'
+        
         for row in reader:
-            if len(row) < 64:
-                continue  # skip malformed rows
-            label = row[0]
-            features = [float(v) for v in row[1:64]]
+            if has_source:
+                if len(row) < 65:
+                    continue
+                label = row[0]
+                features = [float(v) for v in row[2:65]]
+            else:
+                if len(row) < 64:
+                    continue
+                label = row[0]
+                features = [float(v) for v in row[1:64]]
+                
             y.append(label)
             X.append(features)
 
@@ -119,10 +128,10 @@ def train(data_path: str, model_path: str):
                 random_state=42,
             ))
         ]),
-        "Gradient Boosting": Pipeline([
+        "Hist Gradient Boosting": Pipeline([
             ('scaler', StandardScaler()),
-            ('clf', GradientBoostingClassifier(
-                n_estimators=200,
+            ('clf', HistGradientBoostingClassifier(
+                max_iter=200,
                 learning_rate=0.1,
                 max_depth=5,
                 random_state=42,

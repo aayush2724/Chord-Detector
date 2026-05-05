@@ -1,73 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useRef } from 'react';
 import Camera from './components/Camera';
+import HandSkeleton from './components/HandSkeleton';
 import ChordOverlay from './components/ChordOverlay';
+import './index.css';
 
 function App() {
+  const [landmarks, setLandmarks] = useState(null);
   const [prediction, setPrediction] = useState(null);
-  const [backendStatus, setBackendStatus] = useState('connecting'); // connecting, connected, error
-  const [supportedChords, setSupportedChords] = useState([]);
-
-  useEffect(() => {
-    // Fetch supported chords on load
-    const fetchClasses = async () => {
-      try {
-        const res = await axios.get('http://localhost:3001/api/classes');
-        if (res.data && res.data.classes) {
-          setSupportedChords(res.data.classes);
-        }
-      } catch (err) {
-        console.warn("Could not fetch supported chords", err);
-      }
-    };
-    fetchClasses();
-  }, []);
-
-  const handleChordDetected = (data) => {
-    setPrediction(data);
-  };
+  const [status, setStatus] = useState('Initializing...');
+  const videoRef = useRef(null);
 
   return (
     <div className="app-container">
-      {/* Header */}
-      <header className="header glass-panel">
-        <div className="brand">🎸 ChordSense</div>
-        <div className="status-badge">
-          <div className={`status-dot ${backendStatus}`}></div>
-          {backendStatus === 'connected' && 'Live Engine Active'}
-          {backendStatus === 'connecting' && 'Connecting to Backend...'}
-          {backendStatus === 'error' && 'Backend Unavailable'}
+      <header className="app-header">
+        <h1>Guitar Chord Detector</h1>
+        <div className="status-indicator">
+          <span className="pulse-dot"></span>
+          {status}
         </div>
       </header>
 
-      {/* Main Stage */}
-      <main className="main-stage">
+      <main className="video-container">
         <Camera 
-          onChordDetected={handleChordDetected} 
-          setBackendStatus={setBackendStatus}
+          videoRef={videoRef}
+          onLandmarks={setLandmarks} 
+          onPrediction={setPrediction}
+          onStatusChange={setStatus}
         />
-        
-        <ChordOverlay 
-          predictedChord={prediction?.chord} 
-          confidence={prediction?.confidence} 
-        />
+        <HandSkeleton landmarks={landmarks} videoRef={videoRef} />
+        <ChordOverlay prediction={prediction} />
       </main>
-
-      {/* Footer / Info Strip */}
-      <div className="chords-strip glass-panel">
-        {supportedChords.length > 0 ? (
-          supportedChords.map(c => (
-            <div 
-              key={c} 
-              className={`chord-pill ${prediction?.chord === c ? 'active' : ''}`}
-            >
-              {c}
-            </div>
-          ))
-        ) : (
-          <div className="chord-pill">Loading model classes...</div>
-        )}
-      </div>
     </div>
   );
 }

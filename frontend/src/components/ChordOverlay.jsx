@@ -1,21 +1,18 @@
 import React from 'react';
 
-const ChordOverlay = ({ predictedChord, confidence }) => {
-  const isVisible = predictedChord && confidence > 0.6;
-  const displayConfidence = Math.round((confidence || 0) * 100);
-
+const ChordOverlay = ({ prediction }) => {
+  const isVisible = prediction && prediction.confidence > 0.6 && prediction.chord !== 'Background';
+  
   return (
-    <div className={`chord-popup-container ${isVisible ? 'visible' : 'hidden'}`}>
-      <div className="chord-card">
-        <div className="chord-label">{predictedChord || '...'}</div>
-        <div className="confidence-bar-container">
-          <div 
-            className="confidence-bar" 
-            style={{ width: `${displayConfidence}%` }} 
-          />
+    <div className={`chord-overlay-container ${isVisible ? 'visible' : 'hidden'}`}>
+      {isVisible && (
+        <div className="chord-badge">
+          <div className="chord-name">{prediction.chord}</div>
+          <div className="chord-confidence">
+            {Math.round(prediction.confidence * 100)}% Match
+          </div>
         </div>
-        <div className="confidence-text">{displayConfidence}% Match</div>
-      </div>
+      )}
     </div>
   );
 };
