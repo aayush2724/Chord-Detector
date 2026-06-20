@@ -39,6 +39,42 @@ body {
   right: 0;
 }
 
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.mode-toggle {
+  display: flex;
+  background-color: var(--bg-panel);
+  border-radius: 20px;
+  padding: 2px;
+  backdrop-filter: blur(4px);
+}
+
+.mode-btn {
+  background: transparent;
+  border: none;
+  color: #888;
+  padding: 0.4rem 1rem;
+  border-radius: 18px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.mode-btn:hover {
+  color: var(--text-light);
+}
+
+.mode-btn.active {
+  background-color: var(--accent-cyan);
+  color: #000;
+  font-weight: 600;
+}
+
 .app-header h1 {
   font-size: 1.5rem;
   font-weight: 600;

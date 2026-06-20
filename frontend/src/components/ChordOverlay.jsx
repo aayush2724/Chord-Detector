@@ -1,5 +1,3 @@
-import React from 'react';
-
 const ChordOverlay = ({ prediction }) => {
   const isVisible = prediction && prediction.confidence > 0.6 && prediction.chord !== 'Background';
   
