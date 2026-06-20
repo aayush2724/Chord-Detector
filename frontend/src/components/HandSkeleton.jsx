@@ -9,6 +9,30 @@ const HAND_CONNECTIONS = [
   [5, 9], [9, 13], [13, 17]
 ];
 
+const HAND_COLORS = ['#00ffcc', '#ff6b6b'];
+
+function drawHand(ctx, handLandmarks, w, h, color) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  for (const [a, b] of HAND_CONNECTIONS) {
+    const p1 = handLandmarks[a];
+    const p2 = handLandmarks[b];
+    if (!p1 || !p2) continue;
+    ctx.beginPath();
+    ctx.moveTo(p1.x * w, p1.y * h);
+    ctx.lineTo(p2.x * w, p2.y * h);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = color;
+  for (const lm of handLandmarks) {
+    if (!lm) continue;
+    ctx.beginPath();
+    ctx.arc(lm.x * w, lm.y * h, 4, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+}
+
 export default function HandSkeleton({ landmarks, videoRef }) {
   const canvasRef = useRef(null);
 
@@ -34,25 +58,12 @@ export default function HandSkeleton({ landmarks, videoRef }) {
       const w = canvas.width;
       const h = canvas.height;
 
-      ctx.strokeStyle = "#00ffcc";
-      ctx.lineWidth = 2;
-      for (const [a, b] of HAND_CONNECTIONS) {
-        const p1 = landmarks[a];
-        const p2 = landmarks[b];
-        if (!p1 || !p2) continue;
-        ctx.beginPath();
-        ctx.moveTo(p1.x * w, p1.y * h);
-        ctx.lineTo(p2.x * w, p2.y * h);
-        ctx.stroke();
-      }
+      const isMultiHand = Array.isArray(landmarks[0]);
+      const hands = isMultiHand ? landmarks : [landmarks];
 
-      ctx.fillStyle = "#00ffcc";
-      for (const lm of landmarks) {
-        if (!lm) continue;
-        ctx.beginPath();
-        ctx.arc(lm.x * w, lm.y * h, 4, 0, 2 * Math.PI);
-        ctx.fill();
-      }
+      hands.forEach((hand, i) => {
+        drawHand(ctx, hand, w, h, HAND_COLORS[i % HAND_COLORS.length]);
+      });
     };
 
     const resizeObserver = new ResizeObserver(draw);
