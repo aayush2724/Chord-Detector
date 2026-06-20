@@ -10,15 +10,11 @@ Then overlays augmentation to cover all patterns/voicings.
 Output: data/global_chords.csv
 """
 
-import os
 import csv
+import os
 import sys
-import io
 
-import cv2
-import numpy as np
 import mediapipe as mp
-
 
 # ──────────────────────────────────────────────────────────
 # 1.  CHECK DEPENDENCIES
@@ -74,7 +70,7 @@ def extract_landmarks(landmarker, pil_image):
             for lm in result.hand_landmarks[0]:
                 flat.extend([lm.x, lm.y, lm.z])
             return flat
-    except Exception as e:
+    except Exception:
         pass
     return None
 
@@ -84,7 +80,7 @@ def extract_landmarks(landmarker, pil_image):
 # ──────────────────────────────────────────────────────────
 
 def main():
-    datasets_lib = ensure_deps()
+    ensure_deps()
     from datasets import load_dataset
 
     os.makedirs('data', exist_ok=True)
@@ -157,7 +153,7 @@ def main():
     csv_file.close()
     landmarker.close()
 
-    print(f"\n✅ Done!")
+    print("\n✅ Done!")
     print(f"   Total images processed : {total}")
     print(f"   Hands extracted        : {saved}")
     print(f"   No hand found (skipped): {skipped}")

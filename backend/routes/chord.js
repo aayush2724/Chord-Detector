@@ -12,7 +12,7 @@ router.post('/predict', async (req, res) => {
       return res.status(400).json({ error: 'Expected 63 landmark floats' });
     }
 
-    const response = await axios.post(`${FASTAPI_URL}/predict`, { landmarks });
+    const response = await axios.post(`${FASTAPI_URL}/predict`, { landmarks }, { timeout: 2000 });
     
     res.json(response.data);
   } catch (error) {

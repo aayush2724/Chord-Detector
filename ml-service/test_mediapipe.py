@@ -1,7 +1,9 @@
+import os
+import time
+
 import cv2
 import mediapipe as mp
-import time
-import os
+
 
 def draw_landmarks(frame, hand_landmarks):
     h, w, c = frame.shape
@@ -57,7 +59,7 @@ def main():
             frame = cv2.flip(frame, 1)
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
-            
+
             # Use current time in ms for video mode
             timestamp_ms = int(time.time() * 1000)
             result = landmarker.detect_for_video(mp_image, timestamp_ms)

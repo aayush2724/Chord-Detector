@@ -2,11 +2,39 @@ import React, { useEffect, useRef, useState } from 'react';
 import { HandLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import axios from 'axios';
 
+const SMOOTHING_WINDOW = 5;
+const CONFIDENCE_THRESHOLD = 0.6;
+
+function smoothPredictions(buffer) {
+  if (buffer.length === 0) return null;
+  if (buffer.length === 1) return buffer[0];
+
+  const counts = {};
+  for (const pred of buffer) {
+    if (!pred.chord || pred.chord === 'Background') continue;
+    counts[pred.chord] = (counts[pred.chord] || 0) + pred.confidence;
+  }
+
+  if (Object.keys(counts).length === 0) return buffer[buffer.length - 1];
+
+  const bestChord = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+  const matching = buffer.filter((p) => p.chord === bestChord);
+  const avgConfidence = matching.reduce((s, p) => s + p.confidence, 0) / matching.length;
+
+  return {
+    chord: bestChord,
+    confidence: avgConfidence,
+    all_probs: buffer[buffer.length - 1].all_probs,
+    model_loaded: true,
+  };
+}
+
 const Camera = ({ videoRef, onLandmarks, onPrediction, onStatusChange }) => {
   const requestRef = useRef();
   const landmarkerRef = useRef(null);
   const lastVideoTimeRef = useRef(-1);
   const lastPostTimeRef = useRef(0);
+  const predictionBufferRef = useRef([]);
 
   const [isModelLoaded, setIsModelLoaded] = useState(false);
 
@@ -109,10 +137,19 @@ const Camera = ({ videoRef, onLandmarks, onPrediction, onStatusChange }) => {
 
   const sendPredictionRequest = async (landmarks) => {
     try {
-      const res = await axios.post('http://localhost:3001/api/predict', { landmarks });
-      onPrediction(res.data);
-      if (res.data.chord && res.data.confidence > 0.6 && res.data.chord !== 'Background') {
-        onStatusChange(`Chord: ${res.data.chord}`);
+      const res = await axios.post('/api/predict', { landmarks }, { timeout: 2000 });
+      const raw = res.data;
+
+      predictionBufferRef.current.push(raw);
+      if (predictionBufferRef.current.length > SMOOTHING_WINDOW) {
+        predictionBufferRef.current.shift();
+      }
+
+      const smoothed = smoothPredictions(predictionBufferRef.current);
+      onPrediction(smoothed);
+
+      if (smoothed.chord && smoothed.confidence > CONFIDENCE_THRESHOLD && smoothed.chord !== 'Background') {
+        onStatusChange(`Chord: ${smoothed.chord}`);
       } else {
         onStatusChange('Hand detected!');
       }

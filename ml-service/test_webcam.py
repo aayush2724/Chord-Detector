@@ -1,11 +1,12 @@
 import cv2
 
+
 def main():
     print("Testing Webcam. Press 'q' to quit.")
-    
+
     # 0 is usually the default built-in webcam
     cap = cv2.VideoCapture(0)
-    
+
     if not cap.isOpened():
         print("Error: Could not open the webcam.")
         return

@@ -9,10 +9,10 @@ Sources (all optional — uses whatever exists):
   - data/chord_recordings.csv         (your personal camera recordings)
 """
 
-import os
 import csv
-import sys
+import os
 import random
+import sys
 from collections import Counter
 
 # Cap Background samples to reduce class imbalance
@@ -113,7 +113,7 @@ def main():
 
     print(f"\n  Total samples : {len(all_rows)}")
     print(f"  Unique classes: {len(label_counts)}")
-    print(f"\n  Class breakdown:")
+    print("\n  Class breakdown:")
     for label, count in label_counts.most_common():
         print(f"    {label:<20} {count}")
 

@@ -19,44 +19,48 @@ export default function HandSkeleton({ landmarks, videoRef }) {
 
     const ctx = canvas.getContext("2d");
 
-    // Match canvas internal resolution to video intrinsic resolution
-    // This makes object-fit: cover behave identically for both
-    if (video.videoWidth) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-    } else {
-      canvas.width = video.clientWidth;
-      canvas.height = video.clientHeight;
-    }
+    const draw = () => {
+      if (video.videoWidth) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      } else {
+        canvas.width = video.clientWidth;
+        canvas.height = video.clientHeight;
+      }
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!landmarks || landmarks.length === 0) return;
 
-    if (!landmarks || landmarks.length === 0) return;
+      const w = canvas.width;
+      const h = canvas.height;
 
-    const w = canvas.width;
-    const h = canvas.height;
+      ctx.strokeStyle = "#00ffcc";
+      ctx.lineWidth = 2;
+      for (const [a, b] of HAND_CONNECTIONS) {
+        const p1 = landmarks[a];
+        const p2 = landmarks[b];
+        if (!p1 || !p2) continue;
+        ctx.beginPath();
+        ctx.moveTo(p1.x * w, p1.y * h);
+        ctx.lineTo(p2.x * w, p2.y * h);
+        ctx.stroke();
+      }
 
-    // Draw connections
-    ctx.strokeStyle = "#00ffcc";
-    ctx.lineWidth = 2;
-    for (const [a, b] of HAND_CONNECTIONS) {
-      const p1 = landmarks[a];
-      const p2 = landmarks[b];
-      if (!p1 || !p2) continue;
-      ctx.beginPath();
-      ctx.moveTo(p1.x * w, p1.y * h);
-      ctx.lineTo(p2.x * w, p2.y * h);
-      ctx.stroke();
-    }
+      ctx.fillStyle = "#00ffcc";
+      for (const lm of landmarks) {
+        if (!lm) continue;
+        ctx.beginPath();
+        ctx.arc(lm.x * w, lm.y * h, 4, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    };
 
-    // Draw dots
-    ctx.fillStyle = "#00ffcc";
-    for (const lm of landmarks) {
-      if (!lm) continue;
-      ctx.beginPath();
-      ctx.arc(lm.x * w, lm.y * h, 4, 0, 2 * Math.PI);
-      ctx.fill();
-    }
+    const resizeObserver = new ResizeObserver(draw);
+    resizeObserver.observe(video);
+
+    draw();
+
+    return () => resizeObserver.disconnect();
   }, [landmarks, videoRef]);
 
   return (

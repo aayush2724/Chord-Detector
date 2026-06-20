@@ -144,3 +144,34 @@ body {
   color: #aaa;
   font-weight: 500;
 }
+
+.chord-diagram-container {
+  position: absolute;
+  bottom: 5%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  pointer-events: none;
+}
+
+.chord-diagram {
+  background: rgba(20, 20, 20, 0.85);
+  border: 2px solid var(--accent-cyan);
+  border-radius: 16px;
+  padding: 1rem 1.5rem;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px rgba(0, 255, 255, 0.15);
+}
+
+.chord-diagram-title {
+  text-align: center;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  margin-bottom: 0.5rem;
+}
+
+.chord-svg {
+  width: 180px;
+  height: auto;
+}

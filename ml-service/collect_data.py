@@ -1,8 +1,10 @@
-import cv2
-import time
-import mediapipe as mp
 import csv
 import os
+import time
+
+import cv2
+import mediapipe as mp
+
 
 def draw_landmarks(frame, hand_landmarks):
     h, w, c = frame.shape
@@ -43,7 +45,7 @@ def main():
     os.makedirs('data', exist_ok=True)
     csv_file_path = 'data/chord_recordings.csv'
     write_header = not os.path.exists(csv_file_path)
-    
+
     csv_file = open(csv_file_path, 'a', newline='')
     writer = csv.writer(csv_file)
     if write_header:
@@ -74,12 +76,13 @@ def main():
     with HandLandmarker.create_from_options(options) as landmarker:
         while cap.isOpened():
             ret, frame = cap.read()
-            if not ret: break
-                
+            if not ret:
+                break
+
             frame = cv2.flip(frame, 1)
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
-            
+
             result = landmarker.detect_for_video(mp_image, int(time.time() * 1000))
 
             landmarks_flat = []
@@ -92,7 +95,7 @@ def main():
             # Handle UI and Recording State
             if recording_state:
                 current_angle = angles[current_angle_idx]
-                
+
                 # Instruction Box
                 cv2.rectangle(frame, (0, 0), (640, 60), (0, 0, 0), -1)
                 msg = f"Recording {current_chord} - {current_angle}"
@@ -105,12 +108,12 @@ def main():
                     writer.writerow([current_chord, current_angle] + landmarks_flat)
                     csv_file.flush()
                     samples_recorded += 1
-                    
+
                     # If finished with this angle
                     if samples_recorded >= samples_per_angle:
                         samples_recorded = 0
                         current_angle_idx += 1
-                        
+
                         # If finished with all angles
                         if current_angle_idx >= len(angles):
                             print(f"Finished sequence for {current_chord}")

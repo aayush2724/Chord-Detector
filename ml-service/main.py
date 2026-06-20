@@ -12,11 +12,12 @@ Usage:
   uvicorn main:app --reload --port 8001
 """
 
+import logging
 import os
 import pickle
-import logging
-import numpy as np
 from contextlib import asynccontextmanager
+
+import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator

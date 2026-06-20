@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import Camera from './components/Camera';
 import HandSkeleton from './components/HandSkeleton';
 import ChordOverlay from './components/ChordOverlay';
+import ChordDiagram from './components/ChordDiagram';
 import './index.css';
 
 function App() {
@@ -9,6 +10,10 @@ function App() {
   const [prediction, setPrediction] = useState(null);
   const [status, setStatus] = useState('Initializing...');
   const videoRef = useRef(null);
+
+  const activeChord = prediction?.chord && prediction.confidence > 0.6 && prediction.chord !== 'Background'
+    ? prediction.chord
+    : null;
 
   return (
     <div className="app-container">
@@ -29,6 +34,11 @@ function App() {
         />
         <HandSkeleton landmarks={landmarks} videoRef={videoRef} />
         <ChordOverlay prediction={prediction} />
+        {activeChord && (
+          <div className="chord-diagram-container">
+            <ChordDiagram chord={activeChord} />
+          </div>
+        )}
       </main>
     </div>
   );

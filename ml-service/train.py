@@ -13,20 +13,22 @@ Output:
   Prints accuracy, classification report, and confusion matrix.
 """
 
-import os
-import csv
 import argparse
+import csv
+import os
 import pickle
-import numpy as np
 import warnings
-warnings.filterwarnings('ignore')
+from datetime import datetime
 
-from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
+import numpy as np
+from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.neural_network import MLPClassifier
-from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+
+warnings.filterwarnings('ignore')
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DATA  = os.path.join(SCRIPT_DIR, "data", "chord_data.csv")
@@ -43,7 +45,7 @@ def load_data(csv_path: str):
         reader = csv.reader(f)
         header = next(reader)
         has_source = len(header) > 1 and header[1] == 'source'
-        
+
         for row in reader:
             if has_source:
                 if len(row) < 65:
@@ -55,7 +57,7 @@ def load_data(csv_path: str):
                     continue
                 label = row[0]
                 features = [float(v) for v in row[1:64]]
-                
+
             y.append(label)
             X.append(features)
 
@@ -171,7 +173,7 @@ def train(data_path: str, model_path: str):
         print(row_str)
 
     # ── Cross-validation score ─────────────────────────────────────────────────
-    print(f"\n[INFO] 5-fold CV on full dataset ...")
+    print("\n[INFO] 5-fold CV on full dataset ...")
     cv_scores = cross_val_score(best_clf, X, y_enc, cv=5, scoring='accuracy', n_jobs=-1)
     print(f"  CV Accuracy: {cv_scores.mean()*100:.2f}% ± {cv_scores.std()*100:.2f}%")
 
@@ -184,11 +186,23 @@ def train(data_path: str, model_path: str):
         'n_features': X.shape[1],
         'model_name': best_name,
         'accuracy': best_acc,
+        'cv_accuracy': float(cv_scores.mean()),
+        'cv_std': float(cv_scores.std()),
+        'trained_at': datetime.now().isoformat(),
+        'n_samples': len(X),
     }
     with open(model_path, 'wb') as f:
         pickle.dump(payload, f)
 
+    # Save a timestamped copy for version history
+    model_dir = os.path.dirname(model_path)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    versioned_path = os.path.join(model_dir, f"chord_model_{timestamp}.pkl")
+    with open(versioned_path, 'wb') as f:
+        pickle.dump(payload, f)
+
     print(f"\n[SAVED] Model written to: {model_path}")
+    print(f"  Versioned copy: {versioned_path}")
     print(f"  Classes: {list(le.classes_)}")
     print_banner("Done! Run main.py to serve the model.")
 
