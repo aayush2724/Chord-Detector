@@ -8,6 +8,8 @@ backend/node_modules/
 frontend/node_modules/
 
 # Environment files
+.env
+.env.local
 
 # Build output
 frontend/dist/
@@ -22,4 +24,3 @@ dist/
 *.pkl
 ml-service/data/
 ml-service/model/
-config.bat
